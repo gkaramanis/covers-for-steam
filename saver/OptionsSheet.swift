@@ -14,7 +14,7 @@ final class OptionsSheet: NSObject {
     init(onDone: @escaping () -> Void) {
         self.onDone = onDone
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 140),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 150),
             styleMask: [.titled],
             backing: .buffered,
             defer: true
@@ -44,7 +44,8 @@ final class OptionsSheet: NSObject {
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Pinned to the content view, and the window sized to fit it.
+        // Pinned to the content view of a fixed-size window. System Settings
+        // ignores a window resized after creation.
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -54,7 +55,6 @@ final class OptionsSheet: NSObject {
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
         window.contentView = content
-        window.setContentSize(stack.fittingSize)
         Self.open = self
     }
 

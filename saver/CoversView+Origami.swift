@@ -1,11 +1,23 @@
 import QuartzCore
 
-/// Origami: every few seconds a new arrangement of panels folds in over the
-/// screen, one panel after another.
+/// Origami, after Apple's slideshow style of that name: covers sit in a
+/// layout of panels. Most ticks one panel turns over to a new cover; every
+/// third tick the whole layout changes with an accordion, a page flip or a
+/// fold.
 extension CoversView {
     private static let layoutCount = 6
-    private static let foldDuration: CFTimeInterval = 1.2
-    private static let stagger: CFTimeInterval = 0.15
+    private static let transitionDuration: CFTimeInterval = 1.3
+    private static let layoutEvery = 3
+
+    func origamiTick() {
+        guard !images.isEmpty, !transitioning else { return }
+        origamiTicks += 1
+        if origamiTicks % Self.layoutEvery == 0 {
+            changeLayout()
+        } else {
+            flipOneTile()
+        }
+    }
 
     /// The frames of a layout other than the current one.
     func nextOrigamiFrames() -> [CGRect] {
@@ -17,37 +29,181 @@ extension CoversView {
         return origamiFrames(layout: next)
     }
 
-    /// Fold a new layout in over the old one, then drop the old panels.
-    func foldInNextLayout() {
-        guard !images.isEmpty else { return }
+    // MARK: Single tiles
+
+    /// A new cover drops onto one tile, hinged at one of its edges.
+    private func flipOneTile() {
+        guard images.count > shown.count, let slot = shown.indices.randomElement(),
+              let next = images.indices.filter({ !shown.contains($0) }).randomElement()
+        else { return }
+
+        let tile = tiles[slot]
+        let card = makeTile(frame: tile.frame, image: images[next])
+        let edge = Edge.allCases.randomElement()!
+        hinge(card, at: edge)
+        let stage = makeStage()
+        stage.addSublayer(card)
+
+        run(cleanup: {
+            tile.contents = self.images[next]
+            stage.removeFromSuperlayer()
+        }) {
+            swing(card, edge: edge, from: edge.openAngle, to: 0, timing: .easeOut)
+            darken(card, from: 0.7, to: 0, timing: .easeIn)
+        }
+        shown[slot] = next
+    }
+
+    // MARK: Layout changes
+
+    private enum Transition: CaseIterable {
+        case accordion, accordionIn, flip, fold
+    }
+
+    private func changeLayout() {
+        let oldTiles = tiles
         let frames = nextOrigamiFrames()
-        let old = tiles
 
         // Covers not on screen first, so a change brings new games.
         var pool = images.indices.filter { !shown.contains($0) }.shuffled()
         if pool.count < frames.count {
             pool += shown.shuffled() + images.indices.shuffled()
         }
-
-        tiles = []
-        shown = []
-        for (step, number) in frames.indices.shuffled().enumerated() {
-            let index = pool[number]
-            let tile = makeTile(frame: frames[number], image: images[index])
-            tile.isHidden = true
-            canvas.addSublayer(tile)
-            tiles.append(tile)
-            shown.append(index)
-            fold(images[index], into: tile, delay: Double(step) * Self.stagger)
+        let newTiles = frames.enumerated().map { number, frame in
+            makeTile(frame: frame, image: images[pool[number]])
         }
 
-        let done = Double(frames.count - 1) * Self.stagger + Self.foldDuration
-        DispatchQueue.main.asyncAfter(deadline: .now() + done) {
+        // The new layout goes underneath; copies of the old one cover it
+        // and move away.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        newTiles.reversed().forEach { canvas.insertSublayer($0, at: 0) }
+        let stage = makeStage()
+        let transition = Transition.allCases.randomElement()!
+        switch transition {
+        case .accordion: accordion(oldTiles, in: stage, toCentre: false)
+        case .accordionIn: accordion(oldTiles, in: stage, toCentre: true)
+        case .flip: pageFlip(from: oldTiles, to: newTiles, in: stage)
+        case .fold: fold(oldTiles, in: stage)
+        }
+        oldTiles.forEach { $0.removeFromSuperlayer() }
+        CATransaction.commit()
+
+        tiles = newTiles
+        shown = Array(pool.prefix(frames.count))
+    }
+
+    /// The old screen collapses in pleats towards an edge, or the centre.
+    private func accordion(_ old: [CALayer], in stage: CALayer, toCentre: Bool) {
+        let edge = Edge.allCases.randomElement()!
+        let count = Int.random(in: 4...6)
+        let strips = (0..<count).map { edge.strip($0, of: count, in: bounds) }
+        let target = toCentre ? edge.centre(of: bounds) : edge.position(in: bounds)
+
+        let pieces = strips.map { copy(of: old, clippedTo: $0) }
+        pieces.forEach(stage.addSublayer)
+        run(cleanup: { stage.removeFromSuperlayer() }) {
+            for (number, piece) in pieces.enumerated() {
+                let to = edge.moving(piece.position, to: target)
+                move(piece, to: to)
+                let angle = (number.isMultiple(of: 2) ? 1 : -1) * CGFloat.pi * 0.47
+                swing(piece, edge: edge, from: 0, to: angle, timing: .easeIn)
+                darken(piece, from: 0, to: 0.8, timing: .easeIn)
+            }
+        }
+    }
+
+    /// Part of the old screen turns over like a page about a line at a half
+    /// or a third, revealing the new layout, and its back lands with the new
+    /// layout on the other side of the line.
+    private func pageFlip(from old: [CALayer], to new: [CALayer], in stage: CALayer) {
+        let edge = Edge.allCases.randomElement()!
+        let fraction = [0.5, 1.0 / 3, 2.0 / 3].randomElement()!
+        let (near, far) = edge.split(bounds, at: fraction)
+
+        // `near` is the side the page lands on; `far` is where it starts.
+        let still = copy(of: old, clippedTo: near)
+        let front = copy(of: old, clippedTo: far)
+        let back = copy(of: new, clippedTo: near)
+        // Both hinge on the line between the parts.
+        hinge(front, at: edge)
+        hinge(back, at: edge.opposite)
+        [still, front, back].forEach(stage.addSublayer)
+
+        let half = Self.transitionDuration / 2
+        run(cleanup: { stage.removeFromSuperlayer() }) {
+            swing(front, edge: edge, from: 0, to: edge.openAngle, duration: half, timing: .easeIn)
+            darken(front, from: 0, to: 0.6, duration: half, timing: .easeIn)
+            swing(back, edge: edge.opposite, from: edge.opposite.openAngle, to: 0, delay: half, duration: half, timing: .easeOut)
+            darken(back, from: 0.6, to: 0, delay: half, duration: half, timing: .easeOut)
+            hide(still, after: Self.transitionDuration)
+        }
+    }
+
+    /// The old screen folds away in two or three panels, the one furthest
+    /// from the edge first.
+    private func fold(_ old: [CALayer], in stage: CALayer) {
+        let edge = Edge.allCases.randomElement()!
+        let count = Int.random(in: 2...3)
+        let panels = (0..<count).map { edge.strip($0, of: count, in: bounds) }
+        let pieces = panels.map { copy(of: old, clippedTo: $0) }
+        pieces.forEach { hinge($0, at: edge) }
+        pieces.forEach(stage.addSublayer)
+
+        let step = Self.transitionDuration / Double(count + 1)
+        run(cleanup: { stage.removeFromSuperlayer() }) {
+            for (order, piece) in edge.farthestFirst(pieces).enumerated() {
+                let delay = Double(order) * step
+                swing(piece, edge: edge, from: 0, to: edge.openAngle, delay: delay, duration: step * 2, timing: .easeIn)
+                darken(piece, from: 0, to: 0.8, delay: delay, duration: step * 2, timing: .easeIn)
+            }
+        }
+    }
+
+    // MARK: Building blocks
+
+    /// A layer holding copies of `tiles`, clipped to `rect`. The copies share
+    /// the tiles' decoded images, so they cost little.
+    private func copy(of tiles: [CALayer], clippedTo rect: CGRect) -> CALayer {
+        let box = CALayer()
+        box.frame = rect
+        box.masksToBounds = true
+        box.backgroundColor = canvas.backgroundColor
+        for tile in tiles where tile.frame.intersects(rect) {
+            box.addSublayer(makeTile(frame: tile.frame.offsetBy(dx: -rect.minX, dy: -rect.minY), image: tile.contents as! CGImage))
+        }
+        return box
+    }
+
+    private func makeStage() -> CALayer {
+        let stage = CALayer()
+        stage.frame = bounds
+        stage.sublayerTransform.m34 = -1 / (max(bounds.width, bounds.height) * 1.5)
+        canvas.addSublayer(stage)
+        return stage
+    }
+
+    /// Move the anchor to `edge` without moving the layer.
+    private func hinge(_ layer: CALayer, at edge: Edge) {
+        let frame = layer.frame
+        layer.anchorPoint = edge.anchor
+        layer.frame = frame
+    }
+
+    /// Run `animations` as one transaction; `cleanup` runs when all of them
+    /// end. No other change starts meanwhile.
+    private func run(cleanup: @escaping () -> Void, animations: () -> Void) {
+        transitioning = true
+        CATransaction.begin()
+        CATransaction.setCompletionBlock {
             CATransaction.begin()
-            CATransaction.setCompletionBlock { old.forEach { $0.removeFromSuperlayer() } }
-            old.forEach { $0.opacity = 0 }
+            CATransaction.setDisableActions(true)
+            cleanup()
             CATransaction.commit()
+            self.transitioning = false
         }
+        animations()
+        CATransaction.commit()
     }
 
     // Covers are 2:3. Full-height panels hold one cover; the smaller ones
@@ -102,94 +258,138 @@ extension CoversView {
             ]
         }
     }
+}
 
-    /// Unfold `image` over `panel` after `delay`: two halves hinged at the
-    /// panel's outer edges swing flat and meet at a centre crease, which runs
-    /// up and down or across at random. The panel shows once they land.
-    private func fold(_ image: CGImage, into panel: CALayer, delay: CFTimeInterval) {
-        let size = panel.bounds.size
-        let crop = fillRect(image: image, in: size)
-        let across = Bool.random()
+// MARK: - Animation helpers
 
-        let stage = CALayer()
-        stage.frame = panel.frame
-        stage.sublayerTransform.m34 = -1 / (max(size.width, size.height) * 3)
-        canvas.addSublayer(stage)
+private let defaultDuration: CFTimeInterval = 1.3
 
-        CATransaction.begin()
-        CATransaction.setCompletionBlock {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            panel.isHidden = false
-            stage.removeFromSuperlayer()
-            CATransaction.commit()
-        }
-        defer { CATransaction.commit() }
+/// Each helper sets the final value on the layer and adds an animation from
+/// the start value, held until its delay ends.
+private func animate(_ layer: CALayer, _ keyPath: String, from: Any, to: Any, delay: CFTimeInterval,
+                     duration: CFTimeInterval, timing: CAMediaTimingFunctionName) {
+    let animation = CABasicAnimation(keyPath: keyPath)
+    animation.fromValue = from
+    animation.toValue = to
+    animation.beginTime = CACurrentMediaTime() + delay
+    animation.duration = duration
+    animation.fillMode = .backwards
+    animation.timingFunction = CAMediaTimingFunction(name: timing)
+    layer.setValue(to, forKeyPath: keyPath)
+    layer.add(animation, forKey: keyPath)
+}
 
-        let start = CACurrentMediaTime() + delay
-        for first in [true, false] {
-            let half = CALayer()
-            half.contents = image
-            half.contentsGravity = .resize
-            half.masksToBounds = true
+private func swing(_ layer: CALayer, edge: Edge, from: CGFloat, to: CGFloat, delay: CFTimeInterval = 0,
+                   duration: CFTimeInterval = defaultDuration, timing: CAMediaTimingFunctionName) {
+    animate(layer, edge.rotationKey, from: from, to: to, delay: delay, duration: duration, timing: timing)
+}
 
-            // contentsRect runs bottom-up here, like the layer frames.
-            let angle: CGFloat
-            if across {
-                half.bounds = CGRect(x: 0, y: 0, width: size.width, height: size.height / 2)
-                half.anchorPoint = CGPoint(x: 0.5, y: first ? 0 : 1)
-                half.position = CGPoint(x: size.width / 2, y: first ? 0 : size.height)
-                half.contentsRect = CGRect(
-                    x: crop.minX, y: crop.minY + (first ? 0 : crop.height / 2),
-                    width: crop.width, height: crop.height / 2
-                )
-                angle = (first ? -1 : 1) * .pi * 0.49
-            } else {
-                half.bounds = CGRect(x: 0, y: 0, width: size.width / 2, height: size.height)
-                half.anchorPoint = CGPoint(x: first ? 0 : 1, y: 0.5)
-                half.position = CGPoint(x: first ? 0 : size.width, y: size.height / 2)
-                half.contentsRect = CGRect(
-                    x: crop.minX + (first ? 0 : crop.width / 2), y: crop.minY,
-                    width: crop.width / 2, height: crop.height
-                )
-                angle = (first ? 1 : -1) * .pi * 0.49
-            }
+private func move(_ layer: CALayer, to position: CGPoint) {
+    animate(layer, "position", from: NSValue(point: layer.position), to: NSValue(point: position),
+            delay: 0, duration: defaultDuration, timing: .easeIn)
+}
 
-            let shade = CALayer()
-            shade.frame = half.bounds
-            shade.backgroundColor = CGColor(gray: 0, alpha: 1)
-            shade.opacity = 0
-            half.addSublayer(shade)
-            stage.addSublayer(half)
+/// A black overlay on `layer`, faded between the two opacities.
+private func darken(_ layer: CALayer, from: Float, to: Float, delay: CFTimeInterval = 0,
+                    duration: CFTimeInterval = defaultDuration, timing: CAMediaTimingFunctionName) {
+    let shade = CALayer()
+    shade.frame = layer.bounds
+    shade.backgroundColor = CGColor(gray: 0, alpha: 1)
+    layer.addSublayer(shade)
+    animate(shade, "opacity", from: from, to: to, delay: delay, duration: duration, timing: timing)
+}
 
-            let swing = CABasicAnimation(keyPath: across ? "transform.rotation.x" : "transform.rotation.y")
-            swing.fromValue = angle
-            swing.toValue = 0
-            let darken = CABasicAnimation(keyPath: "opacity")
-            darken.fromValue = 0.7
-            darken.toValue = 0
+private func hide(_ layer: CALayer, after delay: CFTimeInterval) {
+    animate(layer, "opacity", from: Float(1), to: Float(0), delay: delay, duration: 0.01, timing: .linear)
+}
 
-            // Held at the start value until the delay ends.
-            for (animation, timing) in [(swing, CAMediaTimingFunctionName.easeOut), (darken, .easeIn)] {
-                animation.beginTime = start
-                animation.duration = Self.foldDuration
-                animation.fillMode = .backwards
-                animation.timingFunction = CAMediaTimingFunction(name: timing)
-            }
-            half.add(swing, forKey: "swing")
-            shade.add(darken, forKey: "darken")
+// MARK: - Edges
+
+/// A screen or tile edge, in the canvas's bottom-up coordinates.
+private enum Edge: CaseIterable {
+    case left, right, bottom, top
+
+    var opposite: Edge {
+        switch self {
+        case .left: .right
+        case .right: .left
+        case .bottom: .top
+        case .top: .bottom
         }
     }
 
-    /// The part of `image`, in unit coordinates, that aspect-fills `size`.
-    private func fillRect(image: CGImage, in size: CGSize) -> CGRect {
-        let imageAspect = CGFloat(image.width) / CGFloat(image.height)
-        let panelAspect = size.width / size.height
-        if imageAspect > panelAspect {
-            let width = panelAspect / imageAspect
-            return CGRect(x: (1 - width) / 2, y: 0, width: width, height: 1)
+    var isVertical: Bool { self == .left || self == .right }
+
+    var anchor: CGPoint {
+        switch self {
+        case .left: CGPoint(x: 0, y: 0.5)
+        case .right: CGPoint(x: 1, y: 0.5)
+        case .bottom: CGPoint(x: 0.5, y: 0)
+        case .top: CGPoint(x: 0.5, y: 1)
         }
-        let height = imageAspect / panelAspect
-        return CGRect(x: 0, y: (1 - height) / 2, width: 1, height: height)
+    }
+
+    /// Hinges on the left or right turn about the y axis.
+    var rotationKey: String { isVertical ? "transform.rotation.y" : "transform.rotation.x" }
+
+    /// Nearly edge-on, swung towards the viewer.
+    var openAngle: CGFloat {
+        switch self {
+        case .left, .top: -.pi * 0.49
+        case .right, .bottom: .pi * 0.49
+        }
+    }
+
+    /// Strip `index` of `count`, cut across the axis this edge sits on.
+    func strip(_ index: Int, of count: Int, in bounds: CGRect) -> CGRect {
+        if isVertical {
+            let width = bounds.width / CGFloat(count)
+            return CGRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
+        }
+        let height = bounds.height / CGFloat(count)
+        return CGRect(x: 0, y: CGFloat(index) * height, width: bounds.width, height: height)
+    }
+
+    /// The edge's coordinate along its axis.
+    func position(in bounds: CGRect) -> CGFloat {
+        switch self {
+        case .left: bounds.minX
+        case .right: bounds.maxX
+        case .bottom: bounds.minY
+        case .top: bounds.maxY
+        }
+    }
+
+    func centre(of bounds: CGRect) -> CGFloat { isVertical ? bounds.midX : bounds.midY }
+
+    func moving(_ point: CGPoint, to coordinate: CGFloat) -> CGPoint {
+        isVertical ? CGPoint(x: coordinate, y: point.y) : CGPoint(x: point.x, y: coordinate)
+    }
+
+    /// `bounds` split at `fraction` from this edge: the part by the edge, and the rest.
+    func split(_ bounds: CGRect, at fraction: Double) -> (near: CGRect, far: CGRect) {
+        let length = (isVertical ? bounds.width : bounds.height) * fraction
+        let edge: CGRectEdge = switch self {
+        case .left: .minXEdge
+        case .right: .maxXEdge
+        case .bottom: .minYEdge
+        case .top: .maxYEdge
+        }
+        let parts = bounds.divided(atDistance: length, from: edge)
+        return (parts.slice, parts.remainder)
+    }
+
+    func farthestFirst(_ layers: [CALayer]) -> [CALayer] {
+        layers.sorted { distance(of: $0) > distance(of: $1) }
+    }
+
+    private func distance(of layer: CALayer) -> CGFloat {
+        let frame = layer.frame
+        switch self {
+        case .left: return frame.midX
+        case .right: return -frame.midX
+        case .bottom: return frame.midY
+        case .top: return -frame.midY
+        }
     }
 }

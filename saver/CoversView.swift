@@ -16,6 +16,8 @@ final class CoversView: ScreenSaverView {
     var tiles: [CALayer] = []
     var shown: [Int] = []
     var layoutIndex = -1
+    var origamiTicks = 0
+    var transitioning = false
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
@@ -68,7 +70,7 @@ final class CoversView: ScreenSaverView {
         let includeGenerated = Preferences.includeGenerated
         if images.isEmpty || includeGenerated != loadedGenerated {
             images = CoverLibrary.coverURLs(includeGenerated: includeGenerated).compactMap { url in
-                NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+                NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil).flatMap(Self.decoded)
             }
             loadedGenerated = includeGenerated
         }
@@ -77,7 +79,7 @@ final class CoversView: ScreenSaverView {
 
     override func animateOneFrame() {
         if mode == .origami {
-            foldInNextLayout()
+            origamiTick()
             return
         }
         guard images.count > shown.count, let slot = shown.indices.randomElement() else { return }
@@ -120,6 +122,18 @@ final class CoversView: ScreenSaverView {
             tiles.append(tile)
             shown.append(index)
         }
+    }
+
+    /// A bitmap copy of `image`. JPEGs otherwise decode on first draw, in
+    /// the middle of an animation.
+    private static func decoded(_ image: CGImage) -> CGImage? {
+        guard let context = CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return image }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage() ?? image
     }
 
     func makeTile(frame: CGRect, image: CGImage) -> CALayer {

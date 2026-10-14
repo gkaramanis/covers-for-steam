@@ -16,7 +16,7 @@ enum DisplayMode: String, CaseIterable {
     var interval: TimeInterval {
         switch self {
         case .wall: 3
-        case .origami: 5
+        case .origami: 2.5
         }
     }
 }
