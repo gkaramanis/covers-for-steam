@@ -13,8 +13,9 @@ enum CoverLibrary {
     }
 
     /// One cover per app ID. Some covers sit in hashed subfolders, so each
-    /// app folder is searched and the largest file wins.
-    static func coverURLs() -> [URL] {
+    /// app folder is searched and the largest file wins. Steam saves its
+    /// generated covers as PNG under a .jpg name; real covers are JPEG.
+    static func coverURLs(includeGenerated: Bool) -> [URL] {
         let fileManager = FileManager.default
         let apps: [URL]
         do {
@@ -34,10 +35,18 @@ enum CoverLibrary {
                 let size = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 if size > best?.size ?? -1 { best = (file, size) }
             }
-            return best?.url
+            guard let url = best?.url, includeGenerated || !isPNG(url) else { return nil }
+            return url
         }
 
         log.notice("Found \(covers.count, privacy: .public) covers in \(apps.count, privacy: .public) app folders")
         return covers
+    }
+
+    private static func isPNG(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let signature = (try? handle.read(upToCount: 4)) ?? Data()
+        return signature == Data([0x89, 0x50, 0x4E, 0x47])
     }
 }

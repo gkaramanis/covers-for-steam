@@ -4,12 +4,13 @@ import AppKit
 final class OptionsSheet: NSObject {
     let window: NSWindow
     private let popup = NSPopUpButton()
-    private let onDone: (DisplayMode) -> Void
+    private let generated = NSButton(checkboxWithTitle: "Include Steam's generated covers", target: nil, action: nil)
+    private let onDone: () -> Void
 
-    init(current: DisplayMode, onDone: @escaping (DisplayMode) -> Void) {
+    init(onDone: @escaping () -> Void) {
         self.onDone = onDone
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 300, height: 110),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 140),
             styleMask: [.titled],
             backing: .buffered,
             defer: true
@@ -17,16 +18,22 @@ final class OptionsSheet: NSObject {
         super.init()
 
         popup.addItems(withTitles: DisplayMode.allCases.map(\.title))
-        popup.selectItem(at: DisplayMode.allCases.firstIndex(of: current) ?? 0)
+        popup.selectItem(at: DisplayMode.allCases.firstIndex(of: Preferences.mode) ?? 0)
+        generated.state = Preferences.includeGenerated ? .on : .off
 
-        let label = NSTextField(labelWithString: "Display:")
-        let row = NSStackView(views: [label, popup])
-        row.spacing = 8
+        let grid = NSGridView(views: [
+            [NSTextField(labelWithString: "Display:"), popup],
+            [NSGridCell.emptyContentView, generated],
+        ])
+        grid.rowAlignment = .firstBaseline
+        grid.column(at: 0).xPlacement = .trailing
+        grid.columnSpacing = 8
+        grid.rowSpacing = 12
 
         let done = NSButton(title: "Done", target: self, action: #selector(finish))
         done.keyEquivalent = "\r"
 
-        let stack = NSStackView(views: [row, done])
+        let stack = NSStackView(views: [grid, done])
         stack.orientation = .vertical
         stack.alignment = .trailing
         stack.spacing = 20
@@ -35,9 +42,9 @@ final class OptionsSheet: NSObject {
     }
 
     @objc private func finish() {
-        let mode = DisplayMode.allCases[max(popup.indexOfSelectedItem, 0)]
-        DisplayMode.saved = mode
+        Preferences.mode = DisplayMode.allCases[max(popup.indexOfSelectedItem, 0)]
+        Preferences.includeGenerated = generated.state == .on
         window.sheetParent?.endSheet(window)
-        onDone(mode)
+        onDone()
     }
 }

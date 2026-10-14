@@ -7,7 +7,8 @@ import os
 final class CoversView: ScreenSaverView {
     private let log = Logger(subsystem: "local.covers-for-steam", category: "view")
     private var optionsSheet: OptionsSheet?
-    private var mode = DisplayMode.saved
+    private var mode = Preferences.mode
+    private var loadedGenerated = false
 
     /// Holds every layer the saver draws, apart from AppKit's own.
     let canvas = CALayer()
@@ -31,11 +32,10 @@ final class CoversView: ScreenSaverView {
     override var hasConfigureSheet: Bool { true }
 
     override var configureSheet: NSWindow? {
-        let sheet = OptionsSheet(current: mode) { [weak self] mode in
+        let sheet = OptionsSheet { [weak self] in
             guard let self else { return }
-            self.mode = mode
-            self.animationTimeInterval = mode.interval
             self.optionsSheet = nil
+            self.applyPreferences()
             self.build()
         }
         optionsSheet = sheet
@@ -43,16 +43,23 @@ final class CoversView: ScreenSaverView {
     }
 
     override func startAnimation() {
-        mode = DisplayMode.saved
-        animationTimeInterval = mode.interval
+        applyPreferences()
         super.startAnimation()
-        if images.isEmpty {
-            images = CoverLibrary.coverURLs().compactMap { url in
+        build()
+    }
+
+    /// Read the saved options and reload the covers if the set changed.
+    private func applyPreferences() {
+        mode = Preferences.mode
+        animationTimeInterval = mode.interval
+        let includeGenerated = Preferences.includeGenerated
+        if images.isEmpty || includeGenerated != loadedGenerated {
+            images = CoverLibrary.coverURLs(includeGenerated: includeGenerated).compactMap { url in
                 NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil)
             }
-            log.notice("Loaded \(self.images.count, privacy: .public) images, preview: \(self.isPreview, privacy: .public)")
+            loadedGenerated = includeGenerated
         }
-        build()
+        log.notice("Mode \(self.mode.rawValue, privacy: .public), \(self.images.count, privacy: .public) images, generated: \(includeGenerated, privacy: .public), preview: \(self.isPreview, privacy: .public)")
     }
 
     override func animateOneFrame() {

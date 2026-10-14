@@ -1,6 +1,6 @@
-import ScreenSaver
+import Foundation
 
-/// How the covers are shown, saved in the screensaver's own defaults.
+/// How the covers are shown.
 enum DisplayMode: String, CaseIterable {
     case wall
     case origami
@@ -17,19 +17,6 @@ enum DisplayMode: String, CaseIterable {
         switch self {
         case .wall: 3
         case .origami: 4
-        }
-    }
-
-    private static let key = "displayMode"
-    private static var defaults: ScreenSaverDefaults? {
-        ScreenSaverDefaults(forModuleWithName: "local.covers-for-steam")
-    }
-
-    static var saved: DisplayMode {
-        get { defaults?.string(forKey: key).flatMap(DisplayMode.init) ?? .wall }
-        set {
-            defaults?.set(newValue.rawValue, forKey: key)
-            defaults?.synchronize()
         }
     }
 }
