@@ -1,25 +1,41 @@
-import ScreenSaver
+import Foundation
+import os
 
-/// Options saved in the screensaver's own defaults.
+/// Options saved as a plist in Application Support. Inside legacyScreenSaver
+/// that is the sandbox container, which every saver instance shares.
+/// ScreenSaverDefaults did not keep values between instances there.
 enum Preferences {
-    private static var defaults: ScreenSaverDefaults? {
-        ScreenSaverDefaults(forModuleWithName: "local.covers-for-steam")
+    private static let log = Logger(subsystem: "local.covers-for-steam", category: "preferences")
+
+    private static var url: URL {
+        URL.applicationSupportDirectory.appending(path: "local.covers-for-steam/Preferences.plist")
     }
 
     static var mode: DisplayMode {
-        get { defaults?.string(forKey: "displayMode").flatMap(DisplayMode.init) ?? .wall }
+        get { (load()["displayMode"] as? String).flatMap(DisplayMode.init) ?? .wall }
         set { save(newValue.rawValue, forKey: "displayMode") }
     }
 
     /// Steam's generated covers for apps with no portrait art: the landscape
     /// banner over a blurred stretch of its colours.
     static var includeGenerated: Bool {
-        get { defaults?.bool(forKey: "includeGenerated") ?? false }
+        get { load()["includeGenerated"] as? Bool ?? false }
         set { save(newValue, forKey: "includeGenerated") }
     }
 
+    private static func load() -> [String: Any] {
+        NSDictionary(contentsOf: url) as? [String: Any] ?? [:]
+    }
+
     private static func save(_ value: Any, forKey key: String) {
-        defaults?.set(value, forKey: key)
-        defaults?.synchronize()
+        var values = load()
+        values[key] = value
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try (values as NSDictionary).write(to: url)
+            log.notice("Saved \(key, privacy: .public) = \(String(describing: value), privacy: .public)")
+        } catch {
+            log.error("Cannot save \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }

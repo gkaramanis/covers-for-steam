@@ -2,6 +2,10 @@ import AppKit
 
 /// The sheet behind the Options button in Screen Saver settings.
 final class OptionsSheet: NSObject {
+    /// System Settings can drop the view that made the sheet while it is
+    /// open, so the open sheet keeps itself alive here until Done.
+    private static var open: OptionsSheet?
+
     let window: NSWindow
     private let popup = NSPopUpButton()
     private let generated = NSButton(checkboxWithTitle: "Include Steam's generated covers", target: nil, action: nil)
@@ -39,12 +43,18 @@ final class OptionsSheet: NSObject {
         stack.spacing = 20
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         window.contentView = stack
+        Self.open = self
     }
 
     @objc private func finish() {
         Preferences.mode = DisplayMode.allCases[max(popup.indexOfSelectedItem, 0)]
         Preferences.includeGenerated = generated.state == .on
-        window.sheetParent?.endSheet(window)
+        if let parent = window.sheetParent {
+            parent.endSheet(window)
+        } else {
+            window.orderOut(nil)
+        }
         onDone()
+        Self.open = nil
     }
 }
