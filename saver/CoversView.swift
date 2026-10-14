@@ -2,28 +2,49 @@ import ScreenSaver
 import QuartzCore
 import os
 
-/// A wall of Steam covers. Every few seconds one tile fades to another game.
+/// Steam covers as a wall of tiles or as origami panels.
 @objc(CoversView)
 final class CoversView: ScreenSaverView {
     private let log = Logger(subsystem: "local.covers-for-steam", category: "view")
-    private var images: [CGImage] = []
-    private var tiles: [CALayer] = []
-    private var shown: [Int] = []
+    private var optionsSheet: OptionsSheet?
+    private var mode = DisplayMode.saved
+
+    /// Holds every layer the saver draws, apart from AppKit's own.
+    let canvas = CALayer()
+    var images: [CGImage] = []
+    var tiles: [CALayer] = []
+    var shown: [Int] = []
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
-        animationTimeInterval = 3
+        animationTimeInterval = mode.interval
         wantsLayer = true
         layer?.backgroundColor = NSColor(white: 0.04, alpha: 1).cgColor
+        canvas.frame = bounds
+        layer?.addSublayer(canvas)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
     }
 
-    override var hasConfigureSheet: Bool { false }
+    override var hasConfigureSheet: Bool { true }
+
+    override var configureSheet: NSWindow? {
+        let sheet = OptionsSheet(current: mode) { [weak self] mode in
+            guard let self else { return }
+            self.mode = mode
+            self.animationTimeInterval = mode.interval
+            self.optionsSheet = nil
+            self.build()
+        }
+        optionsSheet = sheet
+        return sheet.window
+    }
 
     override func startAnimation() {
+        mode = DisplayMode.saved
+        animationTimeInterval = mode.interval
         super.startAnimation()
         if images.isEmpty {
             images = CoverLibrary.coverURLs().compactMap { url in
@@ -31,39 +52,64 @@ final class CoversView: ScreenSaverView {
             }
             log.notice("Loaded \(self.images.count, privacy: .public) images, preview: \(self.isPreview, privacy: .public)")
         }
-        buildWall()
+        build()
     }
 
     override func animateOneFrame() {
         guard images.count > shown.count, let slot = shown.indices.randomElement() else { return }
         guard let next = images.indices.filter({ !shown.contains($0) }).randomElement() else { return }
 
-        let fade = CATransition()
-        fade.type = .fade
-        fade.duration = 1.5
-        tiles[slot].add(fade, forKey: "contents")
-        tiles[slot].contents = images[next]
+        switch mode {
+        case .wall:
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 1.5
+            tiles[slot].add(fade, forKey: "contents")
+            tiles[slot].contents = images[next]
+        case .origami:
+            fold(images[next], into: tiles[slot])
+        }
         shown[slot] = next
     }
 
     override func resize(withOldSuperviewSize oldSize: NSSize) {
         super.resize(withOldSuperviewSize: oldSize)
-        buildWall()
+        build()
     }
 
-    // Covers are 2:3, so the row count sets the tile size and the columns
-    // overflow the edges evenly.
-    private func buildWall() {
-        guard let root = layer else { return }
-        tiles.forEach { $0.removeFromSuperlayer() }
+    private func build() {
+        canvas.frame = bounds
+        canvas.sublayers?.forEach { $0.removeFromSuperlayer() }
         tiles = []
         shown = []
 
         guard !images.isEmpty else {
-            showEmptyMessage(in: root)
+            showEmptyMessage()
             return
         }
 
+        let frames = switch mode {
+        case .wall: wallFrames()
+        case .origami: origamiFrames()
+        }
+
+        let pool = images.indices.shuffled()
+        for (number, frame) in frames.enumerated() {
+            let index = pool[number % pool.count]
+            let tile = CALayer()
+            tile.frame = frame
+            tile.contentsGravity = .resizeAspectFill
+            tile.masksToBounds = true
+            tile.contents = images[index]
+            canvas.addSublayer(tile)
+            tiles.append(tile)
+            shown.append(index)
+        }
+    }
+
+    // Covers are 2:3, so the row count sets the tile size and the columns
+    // overflow the edges evenly.
+    private func wallFrames() -> [CGRect] {
         let rows = isPreview ? 2 : 3
         let gap: CGFloat = isPreview ? 2 : 6
         let height = (bounds.height - gap * CGFloat(rows - 1)) / CGFloat(rows)
@@ -72,28 +118,19 @@ final class CoversView: ScreenSaverView {
         let wallWidth = CGFloat(columns) * (width + gap) - gap
         let x0 = (bounds.width - wallWidth) / 2
 
-        let pool = images.indices.shuffled()
-        for row in 0..<rows {
-            for column in 0..<columns {
-                let tile = CALayer()
-                tile.frame = CGRect(
+        return (0..<rows).flatMap { row in
+            (0..<columns).map { column in
+                CGRect(
                     x: x0 + CGFloat(column) * (width + gap),
                     y: CGFloat(row) * (height + gap),
                     width: width,
                     height: height
                 )
-                tile.contentsGravity = .resizeAspectFill
-                tile.masksToBounds = true
-                let index = pool[(row * columns + column) % pool.count]
-                tile.contents = images[index]
-                root.addSublayer(tile)
-                tiles.append(tile)
-                shown.append(index)
             }
         }
     }
 
-    private func showEmptyMessage(in root: CALayer) {
+    private func showEmptyMessage() {
         let text = CATextLayer()
         text.string = "No Steam covers found.\nOpen your Steam library once to fill the cache."
         text.alignmentMode = .center
@@ -101,7 +138,6 @@ final class CoversView: ScreenSaverView {
         text.foregroundColor = NSColor(white: 0.7, alpha: 1).cgColor
         text.contentsScale = window?.backingScaleFactor ?? 2
         text.frame = bounds.insetBy(dx: 20, dy: bounds.height / 2 - (isPreview ? 20 : 40))
-        root.addSublayer(text)
-        tiles.append(text)
+        canvas.addSublayer(text)
     }
 }
