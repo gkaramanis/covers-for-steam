@@ -39,6 +39,7 @@ extension CoversView {
 
         let tile = tiles[slot]
         let card = makeTile(frame: tile.frame, image: images[next])
+        smoothEdges(card)
         let edge = Edge.allCases.randomElement()!
         hinge(card, at: edge)
         let stage = makeStage()
@@ -168,11 +169,19 @@ extension CoversView {
         let box = CALayer()
         box.frame = rect
         box.masksToBounds = true
-        box.backgroundColor = canvas.backgroundColor
+        // Opaque, so the gaps between panels don't show the layer beneath.
+        box.backgroundColor = Self.backdrop
+        smoothEdges(box)
         for tile in tiles where tile.frame.intersects(rect) {
             box.addSublayer(makeTile(frame: tile.frame.offsetBy(dx: -rect.minX, dy: -rect.minY), image: tile.contents as! CGImage))
         }
         return box
+    }
+
+    /// Rotated layers get jagged, flickering edges unless antialiased.
+    private func smoothEdges(_ layer: CALayer) {
+        layer.allowsEdgeAntialiasing = true
+        layer.isDoubleSided = false
     }
 
     private func makeStage() -> CALayer {
@@ -342,12 +351,14 @@ private enum Edge: CaseIterable {
 
     /// Strip `index` of `count`, cut across the axis this edge sits on.
     func strip(_ index: Int, of count: Int, in bounds: CGRect) -> CGRect {
+        // Cut on whole points, so neighbouring strips meet without a seam.
+        let length = isVertical ? bounds.width : bounds.height
+        let start = (length * CGFloat(index) / CGFloat(count)).rounded()
+        let end = (length * CGFloat(index + 1) / CGFloat(count)).rounded()
         if isVertical {
-            let width = bounds.width / CGFloat(count)
-            return CGRect(x: CGFloat(index) * width, y: 0, width: width, height: bounds.height)
+            return CGRect(x: start, y: 0, width: end - start, height: bounds.height)
         }
-        let height = bounds.height / CGFloat(count)
-        return CGRect(x: 0, y: CGFloat(index) * height, width: bounds.width, height: height)
+        return CGRect(x: 0, y: start, width: bounds.width, height: end - start)
     }
 
     /// The edge's coordinate along its axis.
@@ -368,7 +379,7 @@ private enum Edge: CaseIterable {
 
     /// `bounds` split at `fraction` from this edge: the part by the edge, and the rest.
     func split(_ bounds: CGRect, at fraction: Double) -> (near: CGRect, far: CGRect) {
-        let length = (isVertical ? bounds.width : bounds.height) * fraction
+        let length = ((isVertical ? bounds.width : bounds.height) * fraction).rounded()
         let edge: CGRectEdge = switch self {
         case .left: .minXEdge
         case .right: .maxXEdge

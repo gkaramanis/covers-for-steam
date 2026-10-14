@@ -10,6 +10,8 @@ final class CoversView: ScreenSaverView {
     private var mode = Preferences.mode
     private var loadedGenerated = false
 
+    static let backdrop = CGColor(gray: 0.04, alpha: 1)
+
     /// Holds every layer the saver draws, apart from AppKit's own.
     let canvas = CALayer()
     var images: [CGImage] = []
@@ -23,7 +25,7 @@ final class CoversView: ScreenSaverView {
         super.init(frame: frame, isPreview: isPreview)
         animationTimeInterval = mode.interval
         wantsLayer = true
-        layer?.backgroundColor = NSColor(white: 0.04, alpha: 1).cgColor
+        layer?.backgroundColor = Self.backdrop
         canvas.frame = bounds
         layer?.addSublayer(canvas)
         log.notice("View created, preview: \(isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
