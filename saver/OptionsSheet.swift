@@ -14,8 +14,8 @@ final class OptionsSheet: NSObject {
     init(onDone: @escaping () -> Void) {
         self.onDone = onDone
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 150),
-            styleMask: [.titled],
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 140),
+            styleMask: [.titled, .resizable],
             backing: .buffered,
             defer: true
         )
@@ -37,24 +37,22 @@ final class OptionsSheet: NSObject {
         let done = NSButton(title: "Done", target: self, action: #selector(finish))
         done.keyEquivalent = "\r"
 
-        let stack = NSStackView(views: [grid, done])
-        stack.orientation = .vertical
-        stack.alignment = .trailing
-        stack.spacing = 20
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        // Pinned to the content view of a fixed-size window. System Settings
-        // ignores a window resized after creation.
-        let content = NSView()
-        content.addSubview(stack)
+        // Constraints to the window's own content view, which follows the
+        // size System Settings gives the sheet: the grid centred at the top,
+        // Done in the bottom right corner.
+        let content = window.contentView!
+        for view in [grid, done] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(view)
+        }
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            grid.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
+            grid.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            grid.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 20),
+            done.topAnchor.constraint(greaterThanOrEqualTo: grid.bottomAnchor, constant: 20),
+            done.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            done.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20),
         ])
-        window.contentView = content
         Self.open = self
     }
 
