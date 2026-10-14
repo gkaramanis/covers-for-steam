@@ -1,13 +1,24 @@
 # steam-screensaver
 
-Show the art from your Steam library as the Mac screensaver, without writing a
-`.saver`.
+Show the art from your Steam library as the Mac screensaver. There are two
+routes. One is a native `.saver` that reads Steam's cache directly. The other is
+a sync script feeding macOS's built-in slideshow screensaver.
 
-A script copies cover (or hero) images from Steam's local cache into one flat
-folder. A launchd agent re-runs it when the cache changes and every six hours.
-macOS's built-in slideshow screensaver points at that folder.
+## Screensaver (v0.1)
 
-## Files
+`saver/` holds a native `.saver`, "Covers for Steam". It reads the covers
+straight from Steam's cache and shows them as a wall of tiles, one fading to
+another game every 3 s. `./build.sh` builds a universal, ad-hoc signed bundle
+into `build/`, and `./build.sh --install` copies it to `~/Library/Screen Savers`.
+It logs to the `local.covers-for-steam` subsystem:
+
+```sh
+log show --last 10m --predicate 'subsystem == "local.covers-for-steam"'
+```
+
+## Slideshow route
+
+The files below feed the built-in slideshow screensaver instead.
 
 - `sync-steam-art.sh [dest]` copies `library_600x900.jpg` per app ID into
   `dest` (default `~/Pictures/Steam Art`) as `<appid>_cover.jpg`.
