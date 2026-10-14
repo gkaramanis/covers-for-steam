@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build "Covers for Steam.saver" into build/ and sign it with Developer ID.
-# Pass --install to copy it to ~/Library/Screen Savers.
+# Pass --install to copy it to ~/Library/Screen Savers, or --release to
+# notarize it (keychain profile stripes-notary, same team) and zip it.
 # SIGN_ID overrides the signing identity; SIGN_ID=- signs ad hoc.
 
 set -euo pipefail
@@ -30,6 +31,19 @@ else
 fi
 codesign --verify --strict "$SAVER"
 echo "Built and signed $SAVER"
+
+if [ "${1:-}" = --release ]; then
+  # notarytool needs an archive; the stapled bundle is zipped again for release.
+  version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' saver/Info.plist)
+  zip="build/Covers-for-Steam-$version.zip"
+  ditto -c -k --keepParent "$SAVER" "$zip"
+  xcrun notarytool submit "$zip" --keychain-profile stripes-notary --wait
+  xcrun stapler staple "$SAVER"
+  rm "$zip"
+  ditto -c -k --keepParent "$SAVER" "$zip"
+  xcrun stapler validate "$SAVER"
+  echo "Notarized: $zip"
+fi
 
 if [ "${1:-}" = --install ]; then
   mkdir -p "$HOME/Library/Screen Savers"
