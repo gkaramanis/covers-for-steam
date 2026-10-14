@@ -15,6 +15,7 @@ final class CoversView: ScreenSaverView {
     var images: [CGImage] = []
     var tiles: [CALayer] = []
     var shown: [Int] = []
+    var layoutIndex = -1
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
@@ -75,19 +76,18 @@ final class CoversView: ScreenSaverView {
     }
 
     override func animateOneFrame() {
+        if mode == .origami {
+            foldInNextLayout()
+            return
+        }
         guard images.count > shown.count, let slot = shown.indices.randomElement() else { return }
         guard let next = images.indices.filter({ !shown.contains($0) }).randomElement() else { return }
 
-        switch mode {
-        case .wall:
-            let fade = CATransition()
-            fade.type = .fade
-            fade.duration = 1.5
-            tiles[slot].add(fade, forKey: "contents")
-            tiles[slot].contents = images[next]
-        case .origami:
-            fold(images[next], into: tiles[slot])
-        }
+        let fade = CATransition()
+        fade.type = .fade
+        fade.duration = 1.5
+        tiles[slot].add(fade, forKey: "contents")
+        tiles[slot].contents = images[next]
         shown[slot] = next
     }
 
@@ -109,21 +109,26 @@ final class CoversView: ScreenSaverView {
 
         let frames = switch mode {
         case .wall: wallFrames()
-        case .origami: origamiFrames()
+        case .origami: nextOrigamiFrames()
         }
 
         let pool = images.indices.shuffled()
         for (number, frame) in frames.enumerated() {
             let index = pool[number % pool.count]
-            let tile = CALayer()
-            tile.frame = frame
-            tile.contentsGravity = .resizeAspectFill
-            tile.masksToBounds = true
-            tile.contents = images[index]
+            let tile = makeTile(frame: frame, image: images[index])
             canvas.addSublayer(tile)
             tiles.append(tile)
             shown.append(index)
         }
+    }
+
+    func makeTile(frame: CGRect, image: CGImage) -> CALayer {
+        let tile = CALayer()
+        tile.frame = frame
+        tile.contentsGravity = .resizeAspectFill
+        tile.masksToBounds = true
+        tile.contents = image
+        return tile
     }
 
     // Covers are 2:3, so the row count sets the tile size and the columns
