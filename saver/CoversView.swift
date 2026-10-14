@@ -23,6 +23,7 @@ final class CoversView: ScreenSaverView {
         layer?.backgroundColor = NSColor(white: 0.04, alpha: 1).cgColor
         canvas.frame = bounds
         layer?.addSublayer(canvas)
+        log.notice("View created, preview: \(isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
     }
 
     required init?(coder: NSCoder) {
@@ -39,7 +40,18 @@ final class CoversView: ScreenSaverView {
             self.build()
         }
         optionsSheet = sheet
+        log.notice("Options opened, preview: \(self.isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
         return sheet.window
+    }
+
+    // Since macOS 14 the host does not always stop a view when the screen
+    // saver ends. A view whose window has gone stops animating.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil, isAnimating {
+            log.notice("Window gone, stopping, preview: \(self.isPreview, privacy: .public)")
+            stopAnimation()
+        }
     }
 
     override func startAnimation() {
@@ -59,7 +71,7 @@ final class CoversView: ScreenSaverView {
             }
             loadedGenerated = includeGenerated
         }
-        log.notice("Mode \(self.mode.rawValue, privacy: .public), \(self.images.count, privacy: .public) images, generated: \(includeGenerated, privacy: .public), preview: \(self.isPreview, privacy: .public)")
+        log.notice("Mode \(self.mode.rawValue, privacy: .public), \(self.images.count, privacy: .public) images, generated: \(includeGenerated, privacy: .public), preview: \(self.isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
     }
 
     override func animateOneFrame() {
