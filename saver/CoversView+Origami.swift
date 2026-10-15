@@ -291,6 +291,27 @@ private func animate(_ layer: CALayer, _ keyPath: String, from: Any, to: Any, de
 private func swing(_ layer: CALayer, edge: Edge, from: CGFloat, to: CGFloat, delay: CFTimeInterval = 0,
                    duration: CFTimeInterval = defaultDuration, timing: CAMediaTimingFunctionName) {
     animate(layer, edge.rotationKey, from: from, to: to, delay: delay, duration: duration, timing: timing)
+
+    // Under perspective a panel near edge-on still shows: a wide sliver
+    // thrown past its hinge, over the layout beneath. It fades out there.
+    let edgeOn = CGFloat.pi * 0.4
+    if abs(to) >= edgeOn {
+        fade(layer, values: [1, 1, 0], keyTimes: [0, 0.8, 1], delay: delay, duration: duration)
+    } else if abs(from) >= edgeOn {
+        fade(layer, values: [0, 1, 1], keyTimes: [0, 0.2, 1], delay: delay, duration: duration)
+    }
+}
+
+private func fade(_ layer: CALayer, values: [Float], keyTimes: [NSNumber], delay: CFTimeInterval,
+                  duration: CFTimeInterval) {
+    let animation = CAKeyframeAnimation(keyPath: "opacity")
+    animation.values = values
+    animation.keyTimes = keyTimes
+    animation.beginTime = CACurrentMediaTime() + delay
+    animation.duration = duration
+    animation.fillMode = .backwards
+    layer.opacity = values.last!
+    layer.add(animation, forKey: "fade")
 }
 
 private func move(_ layer: CALayer, to position: CGPoint) {
