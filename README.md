@@ -5,7 +5,9 @@ straight from Steam's local cache. Pick Wall (a grid of tiles) or Origami
 (panels that fold in new covers) under Options. Tools, dedicated servers and
 apps such as SteamVR are left out unless you untick Games and demos only.
 
-<img src="images/wall.jpg" alt="The Wall mode: three rows of Steam game covers edge to edge on a black background, including A Little to the Left, Portal, Beneath a Steel Sky, Euro Truck Simulator 2, Batman: Arkham Knight, Heavy Rain and Guacamelee." width="800">
+<img src="images/wall.jpg" alt="Wall mode: three rows of Steam game covers edge to edge on a black background, including Guacamelee, Gone Home, Fez, Streets of Rage 4, Heavy Rain, Helltaker, The Sims 4, Townscaper and A Little to the Left." width="800">
+
+<img src="images/origami.jpg" alt="Origami mode: a full-height cover of Whirlight: No Time to Trip in the middle, with two columns of smaller covers on each side, including Heavy Rain, Haven, Helltaker, Mad Max and Ball x Pit." width="800">
 
 ## Install
 
