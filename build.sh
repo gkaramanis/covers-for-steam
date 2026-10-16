@@ -105,4 +105,10 @@ if [ "${1:-}" = --install ]; then
   # relaunches on demand.
   killall legacyScreenSaver 2>/dev/null || true
   echo "Installed to ~/Library/Screen Savers"
+
+  # A copy from the installer in /Library loads instead of this one.
+  if [ -e "/Library/Screen Savers/Covers for Steam.saver" ]; then
+    echo "Warning: /Library/Screen Savers/Covers for Steam.saver loads instead of this build." >&2
+    echo "Remove it with: sudo mv \"/Library/Screen Savers/Covers for Steam.saver\" ~/.Trash/" >&2
+  fi
 fi

@@ -11,7 +11,7 @@ apps such as SteamVR are left out unless you untick Games and demos only.
 
 ## Install
 
-Download `Covers-for-Steam-0.2.pkg` from
+Download `Covers-for-Steam-0.3.pkg` from
 [Releases](https://github.com/gkaramanis/covers-for-steam/releases), open it
 and follow the steps. To use the zip instead, unzip it and double-click
 `Covers for Steam.saver`. Requires macOS 14 or later, Apple silicon or Intel.
