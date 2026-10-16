@@ -15,6 +15,13 @@ Then choose **Covers for Steam** under System Settings → Wallpaper → Screen
 Saver… → Custom (macOS 26 and later) or System Settings → Screen Saver
 (macOS 14 and 15).
 
+The pkg and the zip hold the same notarized saver. The installer also handles
+updates. It removes a copy in the other Screen Savers folder, which could
+otherwise win over the new one, and restarts macOS's screensaver host, which
+keeps the old version loaded. The zip suits anyone who would rather not run an
+installer. After updating from the zip, run `killall legacyScreenSaver` in
+Terminal, or log out and back in, before the new version shows.
+
 The saver needs Steam installed with a library you have opened at least once,
 so the covers are in its cache.
 
