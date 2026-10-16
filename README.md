@@ -4,6 +4,8 @@ A macOS screensaver that shows the cover art from your Steam library, read
 straight from Steam's local cache. Pick Wall (a grid of tiles) or Origami
 (panels that fold in new covers) under Options.
 
+<img src="images/wall.jpg" alt="The Wall mode: three rows of Steam game covers edge to edge on a black background, including A Little to the Left, Portal, Beneath a Steel Sky, Euro Truck Simulator 2, Batman: Arkham Knight, Heavy Rain and Guacamelee." width="800">
+
 ## Install
 
 Download `Covers-for-Steam-0.2.pkg` from
@@ -33,6 +35,9 @@ so the covers are in its cache.
 ./build.sh --pkg              # the same, plus a signed, notarized installer
 swift tools/thumbnail.swift   # redraw the System Settings thumbnails
 ```
+
+`tools/wall/main.swift` renders the image above from your own Steam cache.
+Build and run commands are at the top of the file.
 
 ## License
 
