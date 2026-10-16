@@ -7,7 +7,7 @@ straight from Steam's local cache. Pick Wall (a grid of tiles) or Origami
 ## Install
 
 Download `Covers-for-Steam-0.2.pkg` from
-[Releases](https://github.com/gkaramanis/steam-screensaver/releases), open it
+[Releases](https://github.com/gkaramanis/covers-for-steam/releases), open it
 and follow the steps. To use the zip instead, unzip it and double-click
 `Covers for Steam.saver`. Requires macOS 14 or later, Apple silicon or Intel.
 
