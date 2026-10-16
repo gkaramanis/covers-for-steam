@@ -9,12 +9,13 @@ final class OptionsSheet: NSObject {
     let window: NSWindow
     private let popup = NSPopUpButton()
     private let generated = NSButton(checkboxWithTitle: "Include Steam's generated covers", target: nil, action: nil)
+    private let gamesOnly = NSButton(checkboxWithTitle: "Games and demos only", target: nil, action: nil)
     private let onDone: () -> Void
 
     init(onDone: @escaping () -> Void) {
         self.onDone = onDone
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 140),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 170),
             styleMask: [.titled, .resizable],
             backing: .buffered,
             defer: true
@@ -24,9 +25,11 @@ final class OptionsSheet: NSObject {
         popup.addItems(withTitles: DisplayMode.allCases.map(\.title))
         popup.selectItem(at: DisplayMode.allCases.firstIndex(of: Preferences.mode) ?? 0)
         generated.state = Preferences.includeGenerated ? .on : .off
+        gamesOnly.state = Preferences.gamesOnly ? .on : .off
 
         let grid = NSGridView(views: [
             [NSTextField(labelWithString: "Display:"), popup],
+            [NSGridCell.emptyContentView, gamesOnly],
             [NSGridCell.emptyContentView, generated],
         ])
         grid.rowAlignment = .firstBaseline
@@ -59,6 +62,7 @@ final class OptionsSheet: NSObject {
     @objc private func finish() {
         Preferences.mode = DisplayMode.allCases[max(popup.indexOfSelectedItem, 0)]
         Preferences.includeGenerated = generated.state == .on
+        Preferences.gamesOnly = gamesOnly.state == .on
         if let parent = window.sheetParent {
             parent.endSheet(window)
         } else {

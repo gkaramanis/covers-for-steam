@@ -9,6 +9,7 @@ final class CoversView: ScreenSaverView {
     private var optionsSheet: OptionsSheet?
     private var mode = Preferences.mode
     private var loadedGenerated = false
+    private var loadedGamesOnly = true
 
     static let backdrop = CGColor(gray: 0.04, alpha: 1)
 
@@ -70,13 +71,15 @@ final class CoversView: ScreenSaverView {
         mode = Preferences.mode
         animationTimeInterval = mode.interval
         let includeGenerated = Preferences.includeGenerated
-        if images.isEmpty || includeGenerated != loadedGenerated {
-            images = CoverLibrary.coverURLs(includeGenerated: includeGenerated).compactMap { url in
+        let gamesOnly = Preferences.gamesOnly
+        if images.isEmpty || includeGenerated != loadedGenerated || gamesOnly != loadedGamesOnly {
+            images = CoverLibrary.coverURLs(includeGenerated: includeGenerated, gamesOnly: gamesOnly).compactMap { url in
                 NSImage(contentsOf: url)?.cgImage(forProposedRect: nil, context: nil, hints: nil).flatMap(Self.decoded)
             }
             loadedGenerated = includeGenerated
+            loadedGamesOnly = gamesOnly
         }
-        log.notice("Mode \(self.mode.rawValue, privacy: .public), \(self.images.count, privacy: .public) images, generated: \(includeGenerated, privacy: .public), preview: \(self.isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
+        log.notice("Mode \(self.mode.rawValue, privacy: .public), \(self.images.count, privacy: .public) images, generated: \(includeGenerated, privacy: .public), games only: \(gamesOnly, privacy: .public), preview: \(self.isPreview, privacy: .public), pid: \(getpid(), privacy: .public)")
     }
 
     override func animateOneFrame() {

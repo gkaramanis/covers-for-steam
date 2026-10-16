@@ -23,6 +23,12 @@ enum Preferences {
         set { save(newValue, forKey: "includeGenerated") }
     }
 
+    /// Leave out tools, servers and applications; games and demos stay.
+    static var gamesOnly: Bool {
+        get { load()["gamesOnly"] as? Bool ?? true }
+        set { save(newValue, forKey: "gamesOnly") }
+    }
+
     private static func load() -> [String: Any] {
         NSDictionary(contentsOf: url) as? [String: Any] ?? [:]
     }

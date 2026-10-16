@@ -15,7 +15,9 @@ enum CoverLibrary {
     /// One cover per app ID. Some covers sit in hashed subfolders, so each
     /// app folder is searched and the largest file wins. Steam saves its
     /// generated covers as PNG under a .jpg name; real covers are JPEG.
-    static func coverURLs(includeGenerated: Bool) -> [URL] {
+    /// With `gamesOnly`, apps that appinfo.vdf lists as anything other than
+    /// a game or demo are left out; apps it doesn't list stay in.
+    static func coverURLs(includeGenerated: Bool, gamesOnly: Bool) -> [URL] {
         let fileManager = FileManager.default
         let apps: [URL]
         do {
@@ -25,8 +27,8 @@ enum CoverLibrary {
             return []
         }
 
-        let covers = apps.compactMap { app -> URL? in
-            guard Int(app.lastPathComponent) != nil,
+        var covers = apps.compactMap { app -> (appID: Int, url: URL)? in
+            guard let appID = Int(app.lastPathComponent),
                   let files = fileManager.enumerator(at: app, includingPropertiesForKeys: [.fileSizeKey])
             else { return nil }
 
@@ -36,11 +38,24 @@ enum CoverLibrary {
                 if size > best?.size ?? -1 { best = (file, size) }
             }
             guard let url = best?.url, includeGenerated || !isPNG(url) else { return nil }
-            return url
+            return (appID, url)
+        }
+
+        if gamesOnly {
+            let appInfo = cacheURL.deletingLastPathComponent().appending(path: "appinfo.vdf")
+            if let types = AppInfo.types(for: Set(covers.map(\.appID)), in: appInfo) {
+                let before = covers.count
+                covers.removeAll { cover in
+                    types[cover.appID].map { !["game", "demo"].contains($0.lowercased()) } ?? false
+                }
+                log.notice("Left out \(before - covers.count, privacy: .public) non-games, \(types.count, privacy: .public) of \(before, privacy: .public) types known")
+            } else {
+                log.error("Cannot read app types from \(appInfo.path, privacy: .public), keeping every cover")
+            }
         }
 
         log.notice("Found \(covers.count, privacy: .public) covers in \(apps.count, privacy: .public) app folders")
-        return covers
+        return covers.map(\.url)
     }
 
     private static func isPNG(_ url: URL) -> Bool {

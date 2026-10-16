@@ -2,7 +2,8 @@
 
 A macOS screensaver that shows the cover art from your Steam library, read
 straight from Steam's local cache. Pick Wall (a grid of tiles) or Origami
-(panels that fold in new covers) under Options.
+(panels that fold in new covers) under Options. Tools, dedicated servers and
+apps such as SteamVR are left out unless you untick Games and demos only.
 
 <img src="images/wall.jpg" alt="The Wall mode: three rows of Steam game covers edge to edge on a black background, including A Little to the Left, Portal, Beneath a Steel Sky, Euro Truck Simulator 2, Batman: Arkham Knight, Heavy Rain and Guacamelee." width="800">
 
