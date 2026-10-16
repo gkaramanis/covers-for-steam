@@ -5,7 +5,7 @@ import os
 /// Steam covers as a wall of tiles or as origami panels.
 @objc(CoversView)
 final class CoversView: ScreenSaverView {
-    private let log = Logger(subsystem: "local.covers-for-steam", category: "view")
+    private let log = Logger(subsystem: "is.karaman.covers-for-steam", category: "view")
     private var optionsSheet: OptionsSheet?
     private var mode = Preferences.mode
     private var loadedGenerated = false

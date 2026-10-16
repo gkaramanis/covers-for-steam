@@ -3,7 +3,7 @@ import os
 
 /// Finds cover images in Steam's local library cache.
 enum CoverLibrary {
-    static let log = Logger(subsystem: "local.covers-for-steam", category: "library")
+    static let log = Logger(subsystem: "is.karaman.covers-for-steam", category: "library")
 
     static var cacheURL: URL {
         // Inside legacyScreenSaver, NSHomeDirectory() is the sandbox container.

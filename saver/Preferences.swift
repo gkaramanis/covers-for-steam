@@ -5,10 +5,10 @@ import os
 /// that is the sandbox container, which every saver instance shares.
 /// ScreenSaverDefaults did not keep values between instances there.
 enum Preferences {
-    private static let log = Logger(subsystem: "local.covers-for-steam", category: "preferences")
+    private static let log = Logger(subsystem: "is.karaman.covers-for-steam", category: "preferences")
 
     private static var url: URL {
-        URL.applicationSupportDirectory.appending(path: "local.covers-for-steam/Preferences.plist")
+        URL.applicationSupportDirectory.appending(path: "is.karaman.covers-for-steam/Preferences.plist")
     }
 
     static var mode: DisplayMode {

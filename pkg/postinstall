@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs after the installer copies Covers for Steam.saver. $2 is the folder it went into.
+
+# A copy in the other Screen Savers folder can win over the new one, so it goes to the Trash.
+name="Covers for Steam.saver"
+case "$2" in
+    "/Library/Screen Savers"*) other="$HOME/Library/Screen Savers/$name" ;;
+    *) other="/Library/Screen Savers/$name" ;;
+esac
+if [ -e "$other" ]; then
+    mv "$other" "$HOME/.Trash/$name.$(date +%s)" || true
+fi
+
+# The saver host keeps the old bundle loaded until it restarts.
+killall legacyScreenSaver 2>/dev/null || true
+exit 0
